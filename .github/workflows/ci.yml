@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build & test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore LayoutSharp.slnx
+
+      - name: Build (Release)
+        run: dotnet build LayoutSharp.slnx -c Release --no-restore
+
+      - name: Test (unit only — integration tests download the detector)
+        run: dotnet test test/LayoutSharp.Tests/LayoutSharp.Tests.csproj -c Release --no-build --filter "Category!=Integration" --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: '**/test-results.trx'
+          if-no-files-found: ignore
+
+  integration:
+    name: Integration (real models, Linux)
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    # Downloads ~160 MB of models on a cache miss; runs the model-backed suite over every test asset.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Cache layout models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/layoutsharp-models
+          key: layoutsharp-models-${{ hashFiles('src/LayoutSharp/Internal/ModelRegistry.cs') }}
+      - name: Run integration tests
+        env:
+          LAYOUTSHARP_CACHE: ~/.cache/layoutsharp-models
+        run: dotnet test test/LayoutSharp.Tests/LayoutSharp.Tests.csproj -c Release --filter "Category=Integration" --logger "console;verbosity=normal"
+
+  aot-smoke:
+    name: Native AOT publish smoke (informational)
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    # Surfaces trim/AOT incompatibilities (the library advertises IsAotCompatible) without blocking PRs.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install Native AOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Publish demo with Native AOT
+        run: dotnet publish test/LayoutSharp.Demo/LayoutSharp.Demo.csproj -c Release -r linux-x64 -p:PublishAot=true -o ./aot-out
+
+  pack:
+    name: Pack (validate nupkg builds)
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Pack library
+        run: dotnet pack src/LayoutSharp/LayoutSharp.csproj -c Release -o ./artifacts
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: ./artifacts/*.nupkg

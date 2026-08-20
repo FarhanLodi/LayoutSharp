@@ -1,0 +1,45 @@
+## .NET build results
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+bld/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+*.nupkg
+*.snupkg
+*.binlog
+TestResults/
+[Tt]est[Rr]esult*/
+BenchmarkDotNet.Artifacts/
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.swp
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Local tooling / secrets
+.venv/
+.env
+.claude/
+
+## Model files (downloaded to the LayoutSharp cache at runtime, never committed)
+*.onnx
+onnx_models/
+
+# Model files staged for Hugging Face upload (172 MB+, never committed)
+upload-to-huggingface/
+*.onnx
+
+# Model training / export tooling (Python venv, datasets, checkpoints)
+training/

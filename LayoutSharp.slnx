@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LayoutSharp/LayoutSharp.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/LayoutSharp.Demo/LayoutSharp.Demo.csproj" />
+    <Project Path="test/LayoutSharp.Tests/LayoutSharp.Tests.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/LayoutSharp.EasyOcrSample/LayoutSharp.EasyOcrSample.csproj" />
+  </Folder>
+</Solution>

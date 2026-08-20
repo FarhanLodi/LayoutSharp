@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+		<IsAotCompatible>true</IsAotCompatible>
+		<PackageId>LayoutSharp</PackageId>
+		<Version>1.0.0</Version>
+		<PackageReleaseNotes>1.0.0: first release. Native .NET document layout analysis on ONNX Runtime — detects and classifies page regions (title, section header, text, table, figure, caption, formula, footnote, header/footer, page number, seal) with PP-DocLayout (Apache-2.0; plus-L / M / S variants, checksum-verified download on first use), orders them with XY-cut reading order, and returns a typed Document → Page → Block graph with JSON, plain-text and Markdown export. Text recognition is pluggable via ITextRecognizer (bring your own OCR — EasyOcrSharp, Tesseract, a cloud API — or run layout-only). Runtime dependencies: Microsoft.ML.OnnxRuntime, SixLabors.ImageSharp and the Microsoft.Extensions DI/logging abstractions. No Python required.</PackageReleaseNotes>
+		<Authors>Farhan Lodi</Authors>
+		<Description>Native .NET document layout analysis: detect and classify page regions (title, text, table, figure, caption, formula, header/footer…), order them the way a human reads, and optionally OCR text regions through a pluggable recognizer — all on ONNX Runtime, no Python required.</Description>
+		<PackageTags>LayoutAnalysis;DocumentAI;DocumentLayout;ONNX;RT-DETR;PicoDet;PP-DocLayout;DocLayNet;ReadingOrder;OCR;.NET10;AOT</PackageTags>
+		<RepositoryUrl>https://github.com/FarhanLodi/LayoutSharp</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/FarhanLodi/LayoutSharp</PackageProjectUrl>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageIcon>icon.png</PackageIcon>
+		<NeutralLanguage>en-US</NeutralLanguage>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<UseWindowsForms>false</UseWindowsForms>
+		<UseWPF>false</UseWPF>
+		<SupportedOSPlatforms>Windows;Linux;macOS</SupportedOSPlatforms>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="LayoutSharp.Tests" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.29.0" />
+		<PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="../../README.md" Pack="true" PackagePath="" />
+		<None Include="../../LICENSE" Pack="true" PackagePath="" />
+		<None Include="Assets/icon.png" Pack="true" PackagePath="icon.png" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+
+	<!--
+	  Shows how to plug an OCR engine into LayoutSharp: EasyOcrSharp (the author's sibling package)
+	  is adapted to ITextRecognizer in ~10 lines. LayoutSharp itself has no OCR dependency; swap in
+	  Tesseract, a cloud vision API, or anything else the same way.
+	-->
+	<ItemGroup>
+		<PackageReference Include="EasyOcrSharp" Version="2.3.2" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.11" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\src\LayoutSharp\LayoutSharp.csproj" />
+	</ItemGroup>
+
+</Project>
