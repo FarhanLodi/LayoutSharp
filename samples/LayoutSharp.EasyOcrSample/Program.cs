@@ -4,10 +4,10 @@ using LayoutSharp.Models;
 using LayoutSharp.Recognition;
 using LayoutSharp.Services;
 using Microsoft.Extensions.Logging;
-using PaddleOcrNet.Structure;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using EasyOcrSharp.Structure;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
+using EasyImageSharp.Processing;
 
 // LayoutSharp + EasyOcrSharp: layout analysis with the text of every text-bearing region filled in,
 // and — optionally — table structure and formula LaTeX for the table / formula regions.
@@ -121,7 +121,7 @@ sealed class EasyOcrTableRecognizer(IEasyOcrService ocr, IReadOnlyList<string> l
 }
 
 /// <summary>
-/// Formula LaTeX via EasyOcrSharp (PaddleOcrNet's LaTeX-OCR recognizer behind PP-StructureV3). Same
+/// Formula LaTeX via EasyOcrSharp (its LaTeX-OCR recognizer behind PP-StructureV3). Same
 /// whole-page-on-a-crop caveat as <see cref="EasyOcrTableRecognizer"/>.
 /// </summary>
 sealed class EasyOcrFormulaRecognizer(IEasyOcrService ocr) : IFormulaRecognizer
@@ -161,6 +161,6 @@ sealed class EasyOcrFormulaRecognizer(IEasyOcrService ocr) : IFormulaRecognizer
 //       new EasyOcrFormulaRecognizer(sp.GetRequiredService<IEasyOcrService>()));
 //   services.AddLayoutSharp();                                   // ILayoutService picks up all three recognizers
 //
-// If you want EasyOcrSharp's full PP-StructureV3 result for the whole page (its own layout, tables,
-// formulas, seals and reading order in one pass), call ocr.AnalyzeDocumentAsync(imagePath) directly
-// instead of routing crops through LayoutSharp.
+// The table and formula recognizers above call into EasyOcrSharp's PP-StructureV3 pipeline per crop,
+// so LayoutSharp stays in charge of finding the regions and ordering them, and EasyOcrSharp does the
+// recognition it is best at.

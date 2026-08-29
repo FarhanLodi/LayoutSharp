@@ -4,9 +4,9 @@ using LayoutSharp.Models;
 using LayoutSharp.Preprocessing;
 using LayoutSharp.Recognition;
 using Microsoft.Extensions.Logging;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
+using EasyImageSharp.Processing;
 
 namespace LayoutSharp.Services;
 

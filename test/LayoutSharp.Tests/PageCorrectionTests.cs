@@ -1,9 +1,9 @@
 using LayoutSharp.Internal;
 using LayoutSharp.Models;
 using LayoutSharp.Preprocessing;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
+using EasyImageSharp.Processing;
 using Xunit;
 
 namespace LayoutSharp.Tests;
@@ -42,7 +42,7 @@ public class PageCorrectionTests
         // A 4x2 page with a red top-left pixel, rotated so its content reads as N degrees clockwise.
         foreach (var rotation in new[] { 0, 90, 180, 270 })
         {
-            using var source = new Image<Rgb24>(4, 2, Color.White);
+            using var source = new Image<Rgb24>(4, 2, Color.White.ToPixel<Rgb24>());
             source[0, 0] = new Rgb24(255, 0, 0);
             using var upright = PageCorrection.Upright(source, rotation);
 
@@ -73,7 +73,7 @@ public class PageCorrectionTests
         // Source page with a marked pixel; the pipeline sees the page after the content was turned
         // `rotation` degrees clockwise, and rotates it back upright.
         const int w = 7, h = 3;
-        using var upright = new Image<Rgb24>(w, h, Color.White);
+        using var upright = new Image<Rgb24>(w, h, Color.White.ToPixel<Rgb24>());
         upright[0, 0] = new Rgb24(255, 0, 0);
         upright[w - 1, h - 1] = new Rgb24(0, 0, 255);
 
@@ -111,7 +111,7 @@ public class PageCorrectionTests
     {
         // A source page whose content is tilted `skew` degrees clockwise; the service straightens it
         // by rotating -skew, so the corrected canvas is the rotated one.
-        using var source = new Image<Rgb24>(600, 800, Color.White);
+        using var source = new Image<Rgb24>(600, 800, Color.White.ToPixel<Rgb24>());
         // 3x3 marks so bicubic resampling still leaves an unmistakable core pixel.
         var marks = new[] { (100, 100), (500, 100), (100, 700), (500, 700), (300, 400) };
         foreach (var (mx, my) in marks) PageDeskewTests.FillRect(source, mx - 1, my - 1, 3, 3, new Rgb24(255, 0, 0));

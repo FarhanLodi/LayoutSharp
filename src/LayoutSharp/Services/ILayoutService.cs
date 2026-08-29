@@ -1,6 +1,6 @@
 using LayoutSharp.Models;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
 
 namespace LayoutSharp.Services;
 
@@ -79,9 +79,12 @@ public interface ILayoutService : IAsyncDisposable, IDisposable
     /// single-image <c>AnalyzeAsync</c> overloads, by contrast, always analyze only the first frame.
     /// </summary>
     /// <remarks>
-    /// ImageSharp decodes all frames of a file at once and requires them to share one size; a
-    /// multi-page TIFF whose pages differ in size fails to decode (<see cref="NotSupportedException"/>)
-    /// — rasterize such documents page by page and use <see cref="AnalyzePagesAsync"/> instead.
+    /// All frames are decoded at once, so the whole file is held in memory for the duration of the
+    /// call — bound it with <see cref="LayoutServiceOptions.MaxPages"/> and
+    /// <see cref="LayoutServiceOptions.MaxImagePixels"/> for untrusted input, and prefer
+    /// <see cref="AnalyzePagesAsync"/> for very long documents, which pulls one page at a time.
+    /// Frames may differ in size: each is analyzed at its own dimensions and guarded on its own
+    /// pixel count.
     /// </remarks>
     /// <exception cref="TooManyPagesException">The file has more than <see cref="LayoutServiceOptions.MaxPages"/> frames.</exception>
     /// <exception cref="ImageTooLargeException">The frames exceed <see cref="LayoutServiceOptions.MaxImagePixels"/>.</exception>

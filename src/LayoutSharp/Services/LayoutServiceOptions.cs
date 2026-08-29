@@ -10,9 +10,9 @@ namespace LayoutSharp.Services;
 public sealed class LayoutServiceOptions
 {
     /// <summary>The model a fresh <see cref="LayoutServiceOptions"/> runs.</summary>
-    internal const LayoutModel DefaultModel = LayoutModel.DoclingLayoutHeron;
+    internal const LayoutModel DefaultModel = LayoutModel.PPDocLayoutV3;
 
-    /// <summary>The region-detection model to run. Defaults to <see cref="LayoutModel.DoclingLayoutHeron"/>.</summary>
+    /// <summary>The region-detection model to run. Defaults to <see cref="LayoutModel.PPDocLayoutV3"/>.</summary>
     public LayoutModel Model { get; set; } = DefaultModel;
 
     /// <summary>
@@ -113,8 +113,9 @@ public sealed class LayoutServiceOptions
     /// <c>AnalyzeAllFramesAsync</c>) will process; exceeding it throws <see cref="TooManyPagesException"/>.
     /// Multi-frame files (TIFF, GIF, WebP) are rejected from their frame count before any pixels are
     /// decoded; a page sequence fails when page <c>MaxPages + 1</c> is requested. Together with
-    /// <see cref="MaxImagePixels"/> this bounds what a single multi-frame file can claim — ImageSharp
-    /// decodes every frame of a file up front, so lower one of the two for untrusted input.
+    /// <see cref="MaxImagePixels"/> — which is applied to every frame individually, not just the
+    /// first — this bounds what a single multi-frame file can claim. Every frame of a file is
+    /// decoded up front, so lower one of the two for untrusted input.
     /// Default 500. Single-image <c>AnalyzeAsync</c> calls are unaffected.
     /// </summary>
     public int MaxPages { get; set; } = 500;

@@ -1,6 +1,6 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
+using EasyImageSharp.Processing;
 
 namespace LayoutSharp.Preprocessing;
 
@@ -24,7 +24,7 @@ namespace LayoutSharp.Preprocessing;
 public readonly record struct SkewEstimate(double Angle, double Confidence, bool IsReliable);
 
 /// <summary>
-/// Small-angle skew estimation and correction for scanned pages, implemented with ImageSharp only
+/// Small-angle skew estimation and correction for scanned pages, implemented with EasyImageSharp only
 /// (no native dependencies). The estimator downsamples the page, binarises it (Otsu), and finds the
 /// rotation at which the horizontal projection profile of the ink is sharpest — i.e. at which text
 /// lines are horizontal — over ±<c>maxAngle</c> in 0.5° then 0.1° steps.
@@ -183,7 +183,7 @@ public static class PageDeskew
             throw new ArgumentOutOfRangeException(nameof(degrees), degrees, "degrees must be a finite number.");
         if (degrees == 0) return image.Clone();
 
-        // ImageSharp fills the exposed corners of an Rgb24 rotation with black. Rotating the
+        // EasyImageSharp fills the exposed corners of an Rgb24 rotation with black. Rotating the
         // colour-inverted page turns that black into white after inverting back, and because
         // inversion is affine the bicubic interpolation of the content is unaffected. This avoids the
         // Rgba32 round-trip (two extra 4 B/px copies) that BackgroundColor() would need.

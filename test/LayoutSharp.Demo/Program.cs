@@ -23,7 +23,7 @@ bool asJson = args.Contains("--json");
 bool asMarkdown = args.Contains("--markdown");
 bool useGpu = args.Contains("--gpu");
 bool warmupOnly = args.Contains("--warmup-only");
-var model = LayoutModel.DoclingLayoutHeron;
+var model = args.Contains("--heron") ? LayoutModel.DoclingLayoutHeron : new LayoutServiceOptions().Model;
 float threshold = float.TryParse(ArgValue("--threshold"), System.Globalization.NumberStyles.Float,
     System.Globalization.CultureInfo.InvariantCulture, out var t) ? t : 0.5f;
 

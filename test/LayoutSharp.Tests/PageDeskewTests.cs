@@ -1,6 +1,6 @@
 using LayoutSharp.Preprocessing;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -28,7 +28,7 @@ public class PageDeskewTests
     /// <summary>A 1000x1400 white page with ~43 rows of black "words" (no native tilt).</summary>
     internal static Image<Rgb24> SyntheticPage()
     {
-        var img = new Image<Rgb24>(1000, 1400, Color.White);
+        var img = new Image<Rgb24>(1000, 1400, Color.White.ToPixel<Rgb24>());
         var rnd = new Random(42);
         int y = 100;
         while (y < 1300)
@@ -129,15 +129,15 @@ public class PageDeskewTests
     [Fact]
     public void Estimate_BlankAndTinyImages_AreUnreliable_AndDoNotThrow()
     {
-        using var blank = new Image<Rgb24>(800, 1000, Color.White);
+        using var blank = new Image<Rgb24>(800, 1000, Color.White.ToPixel<Rgb24>());
         var e = PageDeskew.Estimate(blank);
         Assert.Equal(new SkewEstimate(0, 0, false), e);
 
-        using var black = new Image<Rgb24>(300, 300, Color.Black);
+        using var black = new Image<Rgb24>(300, 300, Color.Black.ToPixel<Rgb24>());
         var b = PageDeskew.Estimate(black); // no ink/background contrast at all
         Assert.False(b.IsReliable);
 
-        using var tiny = new Image<Rgb24>(40, 40, Color.White);
+        using var tiny = new Image<Rgb24>(40, 40, Color.White.ToPixel<Rgb24>());
         tiny[10, 10] = new Rgb24(0, 0, 0);
         var t = PageDeskew.Estimate(tiny);
         Assert.False(t.IsReliable);
@@ -196,7 +196,7 @@ public class PageDeskewTests
     [Fact]
     public void Rotate_ContentSurvives_AndSourceIsUntouched()
     {
-        using var src = new Image<Rgb24>(200, 100, Color.White);
+        using var src = new Image<Rgb24>(200, 100, Color.White.ToPixel<Rgb24>());
         FillRect(src, 90, 40, 20, 20, new Rgb24(0, 0, 0));
         using var rotated = PageDeskew.Rotate(src, 10);
 

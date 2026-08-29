@@ -43,10 +43,22 @@ internal sealed record LayoutModelSpec(
     DetectorKind Kind = DetectorKind.Detr)
 {
     /// <summary>Default download URL for this asset.</summary>
-    public string Url => $"{ModelRegistry.DefaultBaseUrl}/{FileName}";
+    public string Url => Asset.Url;
 
     /// <summary>Number of categories the detector emits.</summary>
     public int ClassCount => Classes.Count;
+
+    /// <summary>
+    /// Resampler for the input resize, taken from the exporting framework's own preprocessing
+    /// contract: PaddleDetection / PaddleX exports declare <c>interp: 2</c> (<c>cv2.INTER_CUBIC</c>)
+    /// in their <c>inference.yml</c>, while Hugging Face RT-DETR processors
+    /// (<c>resample: BILINEAR</c>) and Ultralytics letterboxing (<c>cv2.INTER_LINEAR</c>) are
+    /// bilinear. Deriving it from <see cref="Kind"/> makes a bring-your-own model match the
+    /// framework it was exported from without the caller having to say so.
+    /// </summary>
+    public ResizeInterpolation Interpolation => Kind == DetectorKind.PaddleDetection
+        ? ResizeInterpolation.Bicubic
+        : ResizeInterpolation.Bilinear;
 
     /// <summary>
     /// Maps a raw detector class index to its definition, or a fallback
@@ -82,17 +94,25 @@ internal sealed record LayoutModelSpec(
 /// </summary>
 /// <remarks>
 /// <para>
-/// The shipped asset is IBM's <c>docling-layout-heron</c> (Apache-2.0, Hugging Face
-/// <c>transformers</c> RT-DETRv2 checkpoint <c>docling-project/docling-layout-heron</c>) exported to
-/// ONNX with <c>training/export_onnx.py</c> in this repository (opset 17). Graph contract: input
+/// <b>PP-DocLayoutV3</b> (Baidu PaddleX, Apache-2.0) is the default. Graph contract: inputs
+/// <c>im_shape [1,2]</c>, <c>image [1,3,800,800]</c> (RGB, stretch-resized, <c>1/255</c>, no
+/// mean/std) and <c>scale_factor [1,2]</c>; outputs post-processed rows <c>[M,7]</c> —
+/// <c>class_id, score, x1, y1, x2, y2</c> plus a seventh reading-order key — an <c>int32</c> row
+/// count, and an <c>[M,200,200]</c> mask head that is deliberately not fetched. See
+/// <see cref="PaddleLayoutDetector"/>.
+/// </para>
+/// <para>
+/// <b>docling-layout-heron</b> (IBM, Apache-2.0, Hugging Face <c>transformers</c> RT-DETRv2
+/// checkpoint <c>docling-project/docling-layout-heron</c>) is exported to ONNX with
+/// <c>training/export_onnx.py</c> in this repository (opset 17). Graph contract: input
 /// <c>pixel_values [1,3,640,640]</c> (RGB, stretch-resized, <c>1/255</c>, no mean/std); outputs
 /// <c>logits [1,300,17]</c> (pre-sigmoid) and <c>pred_boxes [1,300,4]</c> (normalized
 /// <c>cx, cy, w, h</c>). No NMS in the graph — see <see cref="DetrLayoutDetector"/>.
 /// </para>
 /// <para>
-/// The label list below is copied verbatim from the checkpoint's <c>config.json</c>
-/// (<c>id2label</c>). Index order is the wire contract. The raw label is preserved on every block so
-/// a mis-mapping is diagnosable at a glance.
+/// Each label list below is copied verbatim from its checkpoint (PaddleX's exported label file,
+/// heron's <c>config.json</c> <c>id2label</c>). Index order is the wire contract. The raw label is
+/// preserved on every block so a mis-mapping is diagnosable at a glance.
 /// </para>
 /// </remarks>
 internal static class ModelRegistry
@@ -115,8 +135,12 @@ internal static class ModelRegistry
     }
 
     /// <summary>
-    /// Normalizes a Docling layout label (DocLayNet's 11 plus Docling's 6 extensions, snake_case as
-    /// in the checkpoint's <c>id2label</c>) to the library's <see cref="LayoutBlockType"/> taxonomy.
+    /// Normalizes a built-in detector's raw label to the library's <see cref="LayoutBlockType"/>
+    /// taxonomy. Covers both shipped vocabularies: PP-DocLayoutV3's 25 PaddleX labels and Docling's
+    /// 17 (DocLayNet's 11 plus Docling's 6 extensions), snake_case as in each checkpoint. The two
+    /// disagree on spelling rather than meaning — <c>doc_title</c> vs <c>title</c>,
+    /// <c>paragraph_title</c> vs <c>section_header</c>, <c>header</c> vs <c>page_header</c> — so both
+    /// spellings map to one type and <see cref="LayoutBlock.RawClassName"/> keeps the original.
     /// </summary>
     internal static LayoutBlockType TypeOf(string label) => label switch
     {
@@ -130,8 +154,10 @@ internal static class ModelRegistry
         "caption" or "figure_title" or "table_title" or "chart_title" or "vision_footnote" => LayoutBlockType.Caption,
         "formula" or "formula_number" or "display_formula" or "inline_formula" => LayoutBlockType.Formula,
         "footnote" => LayoutBlockType.Footnote,
-        "page_header" => LayoutBlockType.PageHeader,
-        "page_footer" => LayoutBlockType.PageFooter,
+        "page_header" or "header" or "header_image" => LayoutBlockType.PageHeader,
+        "page_footer" or "footer" or "footer_image" => LayoutBlockType.PageFooter,
+        "number" => LayoutBlockType.PageNumber,
+        "seal" or "stamp" => LayoutBlockType.Seal,
         "checkbox_selected" or "checkbox_unselected" => LayoutBlockType.Checkbox,
         "form" => LayoutBlockType.Form,
         "key_value_region" => LayoutBlockType.KeyValueRegion,
@@ -145,6 +171,24 @@ internal static class ModelRegistry
         "section_header", "table", "text", "title", "document_index", "code", "checkbox_selected",
         "checkbox_unselected", "form", "key_value_region");
 
+    // PP-DocLayoutV3: 25 categories in the exported label order (alphabetical, as PaddleX emits
+    // them). Verified against the ONNX export -- the index order is the wire contract.
+    private static readonly RawClass[] PPDocLayoutV3Classes = Map(TypeOf,
+        "abstract", "algorithm", "aside_text", "chart", "content", "display_formula", "doc_title",
+        "figure_title", "footer", "footer_image", "footnote", "formula_number", "header",
+        "header_image", "image", "inline_formula", "number", "paragraph_title", "reference",
+        "reference_content", "seal", "table", "text", "vertical_text", "vision_footnote");
+
+    private static readonly LayoutModelSpec PPDocLayoutV3 = new(
+        LayoutModel.PPDocLayoutV3,
+        FileName: "PP-DocLayoutV3.onnx",
+        Sha256: "DC5670EBBB42E2BA4E41395FC55E8217B007134E8B9E35023D592A8FE040A288",
+        Family: "RT-DETR-L",
+        InputSize: 800,
+        ImageNetNormalize: false,
+        Classes: PPDocLayoutV3Classes,
+        Kind: DetectorKind.PaddleDetection);
+
     private static readonly LayoutModelSpec Heron = new(
         LayoutModel.DoclingLayoutHeron,
         FileName: "docling-layout-heron.onnx",
@@ -154,8 +198,8 @@ internal static class ModelRegistry
         ImageNetNormalize: false,   // preprocessor_config.json: do_normalize false, rescale 1/255 only
         Classes: HeronClasses);
 
-    /// <summary>All registered detectors.</summary>
-    public static IReadOnlyList<LayoutModelSpec> All { get; } = new[] { Heron };
+    /// <summary>All registered detectors, default first.</summary>
+    public static IReadOnlyList<LayoutModelSpec> All { get; } = new[] { PPDocLayoutV3, Heron };
 
     /// <summary>
     /// Looks up the spec for a built-in <see cref="LayoutModel"/>. <see cref="LayoutModel.Custom"/>
@@ -164,6 +208,7 @@ internal static class ModelRegistry
     /// </summary>
     public static LayoutModelSpec Get(LayoutModel model) => model switch
     {
+        LayoutModel.PPDocLayoutV3 => PPDocLayoutV3,
         LayoutModel.DoclingLayoutHeron => Heron,
         LayoutModel.Custom => throw new ArgumentException(
             "LayoutModel.Custom requires LayoutServiceOptions.CustomModel to describe the ONNX file to load.", nameof(model)),

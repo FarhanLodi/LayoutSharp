@@ -1,5 +1,6 @@
 using LayoutSharp.Internal;
 using LayoutSharp.Models;
+using LayoutSharp.Services;
 using Xunit;
 
 namespace LayoutSharp.Tests;
@@ -38,6 +39,70 @@ public class ModelRegistryTests
 
         var spec = ModelRegistry.Get(LayoutModel.DoclingLayoutHeron);
         Assert.Equal(expected, spec.Classes.Select(c => c.Name));
+    }
+
+    [Fact]
+    public void V3Spec_MatchesTheExportedModel()
+    {
+        var spec = ModelRegistry.Get(LayoutModel.PPDocLayoutV3);
+
+        Assert.Equal("PP-DocLayoutV3.onnx", spec.FileName);
+        Assert.Equal(800, spec.InputSize);
+        Assert.Equal(25, spec.ClassCount);
+        Assert.False(spec.ImageNetNormalize);                     // PaddleX: stretch resize + 1/255 only
+        Assert.Equal(DetectorKind.PaddleDetection, spec.Kind);    // post-processing baked into the graph
+        Assert.Equal(64, spec.Sha256.Length);
+        Assert.Null(spec.LocalPath);
+        // Re-hosted byte-for-byte from PaddleX's own export, so the SHA is PaddleX's.
+        Assert.StartsWith(ModelRegistry.DefaultBaseUrl, spec.Url);
+        Assert.EndsWith("/PP-DocLayoutV3.onnx", spec.Url);
+    }
+
+    [Fact]
+    public void V3_IsTheDefaultModel()
+        => Assert.Equal(LayoutModel.PPDocLayoutV3, new LayoutServiceOptions().Model);
+
+    [Fact]
+    public void V3_LabelOrder_MatchesTheExportedLabelFile()
+    {
+        // PaddleX emits its 25 labels alphabetically; the index order is the wire contract.
+        var expected = new[]
+        {
+            "abstract", "algorithm", "aside_text", "chart", "content", "display_formula", "doc_title",
+            "figure_title", "footer", "footer_image", "footnote", "formula_number", "header",
+            "header_image", "image", "inline_formula", "number", "paragraph_title", "reference",
+            "reference_content", "seal", "table", "text", "vertical_text", "vision_footnote",
+        };
+
+        var spec = ModelRegistry.Get(LayoutModel.PPDocLayoutV3);
+        Assert.Equal(expected, spec.Classes.Select(c => c.Name));
+    }
+
+    [Fact]
+    public void V3_ResolvesTheClassesHeronCannotEmit()
+    {
+        // The reason V3 is the default: seals, charts, page numbers and vertical CJK text have no
+        // equivalent anywhere in heron's 17-label DocLayNet vocabulary.
+        var spec = ModelRegistry.Get(LayoutModel.PPDocLayoutV3);
+
+        Assert.Equal(LayoutBlockType.Seal, spec.Resolve(20).Type);
+        Assert.Equal("seal", spec.Resolve(20).Name);
+        Assert.Equal(LayoutBlockType.Figure, spec.Resolve(3).Type);       // chart
+        Assert.Equal(LayoutBlockType.PageNumber, spec.Resolve(16).Type);  // number
+        Assert.Equal(LayoutBlockType.Text, spec.Resolve(23).Type);        // vertical_text
+
+        var heron = ModelRegistry.Get(LayoutModel.DoclingLayoutHeron);
+        Assert.DoesNotContain(LayoutBlockType.Seal, heron.Classes.Select(c => c.Type));
+    }
+
+    [Fact]
+    public void Interpolation_FollowsTheExportingFrameworksContract()
+    {
+        // PP-DocLayoutV3's inference.yml declares Resize(interp: 2), i.e. cv2.INTER_CUBIC; heron's
+        // Hugging Face preprocessor_config.json declares BILINEAR. Using the wrong resampler shifts
+        // every edge in the tensor and moves borderline scores across the confidence threshold.
+        Assert.Equal(ResizeInterpolation.Bicubic, ModelRegistry.Get(LayoutModel.PPDocLayoutV3).Interpolation);
+        Assert.Equal(ResizeInterpolation.Bilinear, ModelRegistry.Get(LayoutModel.DoclingLayoutHeron).Interpolation);
     }
 
     [Fact]
@@ -98,10 +163,18 @@ public class ModelRegistryTests
     [InlineData("picture", LayoutBlockType.Figure)]
     [InlineData("checkbox_selected", LayoutBlockType.Checkbox)]
     [InlineData("key_value_region", LayoutBlockType.KeyValueRegion)]
-    // A custom PaddleDetection export uses PP-DocLayout's vocabulary; those labels map too.
+    // PP-DocLayoutV3's vocabulary spells several types differently; both spellings map.
     [InlineData("doc_title", LayoutBlockType.Title)]
     [InlineData("paragraph_title", LayoutBlockType.SectionHeader)]
     [InlineData("chart", LayoutBlockType.Figure)]
+    [InlineData("seal", LayoutBlockType.Seal)]
+    [InlineData("stamp", LayoutBlockType.Seal)]
+    [InlineData("number", LayoutBlockType.PageNumber)]
+    [InlineData("header", LayoutBlockType.PageHeader)]
+    [InlineData("footer", LayoutBlockType.PageFooter)]
+    [InlineData("header_image", LayoutBlockType.PageHeader)]
+    [InlineData("footer_image", LayoutBlockType.PageFooter)]
+    [InlineData("vertical_text", LayoutBlockType.Text)]
     [InlineData("nonsense_label", LayoutBlockType.Other)]
     public void TypeOf_MapsLabels(string label, LayoutBlockType expected)
         => Assert.Equal(expected, ModelRegistry.TypeOf(label));

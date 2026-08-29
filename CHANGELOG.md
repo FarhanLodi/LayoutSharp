@@ -7,17 +7,33 @@ All notable changes to LayoutSharp are documented here.
 First release.
 
 ### Layout analysis
-- **Region detection** with IBM Docling's **`docling-layout-heron`** (Apache-2.0): RT-DETRv2 with a
-  ResNet-50 backbone, 640×640 input, 17 categories, trained on ~150 k pages (DocLayNet, DocLayNet-v2,
-  WordScape). Exported to ONNX with `training/export_onnx.py` (opset 17; `pixel_values [1,3,640,640]`
-  in, `logits` + `pred_boxes` out) and selected with `LayoutServiceOptions.Model =
-  LayoutModel.DoclingLayoutHeron` — the default, and the only built-in model. It replaced the
-  PP-DocLayout family that earlier previews shipped (`PpDocLayoutPlusL` / `-M` / `-S`) after a
-  head-to-head on real pages: heron segments dense multi-column pages the PP-DocLayout detectors
-  collapsed into a single figure, and adds the form/checkbox/key-value classes. The PaddleDetection
-  decoding path is retained for custom models.
-- **Model delivery**: ~172 MB, downloaded on first use, SHA-256 verified fail-closed, retried with
-  back-off over HTTPS only, written atomically and cached (`LAYOUTSHARP_CACHE`,
+- **Region detection** with two built-in detectors, both Apache-2.0, selected with
+  `LayoutServiceOptions.Model`:
+  - **`LayoutModel.PPDocLayoutV3`** (Baidu PaddleX) — **the default**. RT-DETR-L, 800×800 input,
+    25 categories, ~124 MB. It is the only one of the two that detects **seals** (stamps and red
+    chops on contracts, invoices and certificates), charts as distinct from images, vertical CJK
+    text and page numbers, and it degrades far better on rotated and skewed pages. Its export also
+    carries a per-region reading-order key, so `ReadingOrderSource.Model` works without falling back
+    to XY-cut. Preprocessing reproduces the model's own `inference.yml` exactly —
+    `Resize(target_size: [800, 800], keep_ratio: false, interp: 2)` (bicubic stretch) →
+    `NormalizeImage(norm_type: none)` (plain `1/255`) → `Permute`. The graph's `[M,200,200]` mask
+    head is not fetched.
+  - **`LayoutModel.DoclingLayoutHeron`** (IBM Docling) — RT-DETRv2 with a ResNet-50 backbone,
+    640×640 input, 17 categories, ~164 MB, trained on ~150 k pages (DocLayNet, DocLayNet-v2,
+    WordScape). Exported to ONNX with `training/export_onnx.py` (opset 17; `pixel_values
+    [1,3,640,640]` in, `logits` + `pred_boxes` out). It is ~1.5× faster per page and holds up better
+    on heavy blur and low resolution, and it is the only one with the **list, checkbox, form and
+    key-value** classes — so it remains the better choice for form documents.
+
+  The two taxonomies are complementary, not nested: V3 alone emits `Seal` and `PageNumber`, heron
+  alone emits `List`, `Checkbox`, `Form` and `KeyValueRegion`. README's *Block types* table compares
+  them label by label.
+- **Per-model preprocessing contract**: the input resampler follows the exporting framework rather
+  than being fixed — bicubic (`cv2.INTER_CUBIC`) for PaddleDetection exports as their `inference.yml`
+  declares `interp: 2`, bilinear for Hugging Face RT-DETR processors and Ultralytics letterboxing.
+  Custom models inherit the right one from their `OutputContract`.
+- **Model delivery**: downloaded on first use, SHA-256 verified fail-closed, retried with back-off
+  over HTTPS only, written atomically and cached (`LAYOUTSHARP_CACHE`,
   `LAYOUTSHARP_MODEL_BASE_URL`, `LAYOUTSHARP_OFFLINE`). Only one download runs at a time per process.
 - **Normalized taxonomy** `LayoutBlockType` (Title, SectionHeader, Text, List, Table, Figure,
   Caption, Formula, Footnote, PageHeader, PageFooter, PageNumber, Seal, Checkbox, Form,
@@ -73,7 +89,7 @@ First release.
 - **`LayoutService.ClassifyOrientationAsync(image, ct)`** — runs the classifier on its own, returning
   `(int Rotation, float Confidence)`, independent of `CorrectOrientation`.
 - **`LayoutAnalysisOptions.Deskew` / `DeskewMaxAngle`** (default 15°) — small-angle deskew before
-  detection, gated so straight pages are untouched. Pure ImageSharp, no model, no new dependency,
+  detection, gated so straight pages are untouched. Pure EasyImageSharp, no model, no new dependency,
   ~20–100 ms per page. Runs after orientation correction when both are enabled.
 - **`LayoutSharp.Preprocessing.PageDeskew`** (public) — `Estimate(...)` returning
   `SkewEstimate(Angle, Confidence, IsReliable)`, and `Rotate(image, degrees)` which expands the canvas
@@ -125,7 +141,8 @@ First release.
   (AMD Ryzen 5 4600H, 12 logical cores, CPU only).
 - `LayoutServiceOptions.IntraOpThreads` caps the ORT intra-op pool: leave it `null` for one page at a
   time, set 2–4 when analyzing pages concurrently so sessions stop competing for cores.
-- Reference timings on that machine, warm, 762×1000 page: ~500–550 ms per page end-to-end, of which
+- Reference timings on that machine, warm, 762×1000 page, `DoclingLayoutHeron`: ~500–550 ms per page
+  end-to-end (`PPDocLayoutV3`, the default, is ~1.5× that at ~780–880 ms), of which
   inference is ~490–530 ms (~96 %), preprocessing 8–16 ms and detection decode < 2 ms; PNG decode
   19–89 ms; session creation ~0.9–1.3 s once, first analysis after it ~875 ms — both removed by
   `WarmUpAsync()`.
@@ -135,8 +152,18 @@ First release.
   The model ships as fp32.
 
 ### Project
-- Dependencies: `Microsoft.ML.OnnxRuntime` 1.29, `SixLabors.ImageSharp` 3.1, `Microsoft.Extensions.*`
+- Dependencies: `Microsoft.ML.OnnxRuntime` 1.29, `EasyImageSharp` 1.0, `Microsoft.Extensions.*`
   abstractions 10.0. Targets .NET 10, `IsAotCompatible`.
+- **Imaging on `EasyImageSharp` (MIT).** All image I/O, resizing, rotation, cropping and deskew run
+  on EasyImageSharp rather than SixLabors.ImageSharp, whose 3.x releases are under the Six Labors
+  Split License — a commercial tier above a revenue threshold, which is awkward to inherit through an
+  MIT package. EasyImageSharp is MIT with no threshold, and is one fully managed assembly with no
+  native binaries, so there is no per-architecture asset payload and nothing extra to deploy for
+  Native AOT, trimmed, single-file, Alpine or ARM64 targets.
+- Multi-frame files whose **frames differ in size** are now supported: each frame is analyzed at its
+  own dimensions instead of the whole file failing to decode. Consequently `MaxImagePixels` is
+  enforced per frame rather than once from the container header, so an oversized later frame cannot
+  slip past the guard behind a small first one.
 - Unit tests (pipeline over a scripted detector, all three decoders, XY-cut, registry, custom-model
   validation, page correction, multi-page, table structure, exports, download policy) and
   model-backed integration tests over every image in `test/assets` (`Category=Integration`).

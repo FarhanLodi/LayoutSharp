@@ -2,9 +2,9 @@ using LayoutSharp.Internal;
 using LayoutSharp.Models;
 using LayoutSharp.Preprocessing;
 using LayoutSharp.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
+using EasyImageSharp.Processing;
 using Xunit;
 using Xunit.Abstractions;
 

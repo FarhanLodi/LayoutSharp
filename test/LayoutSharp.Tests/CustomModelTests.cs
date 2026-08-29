@@ -1,8 +1,8 @@
 using LayoutSharp.Internal;
 using LayoutSharp.Models;
 using LayoutSharp.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
 using Xunit;
 
 namespace LayoutSharp.Tests;

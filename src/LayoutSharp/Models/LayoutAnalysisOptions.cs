@@ -78,7 +78,7 @@ public sealed record LayoutAnalysisOptions
     /// order and OCR crops then run on the straightened image; <see cref="LayoutPage.SkewAngle"/>,
     /// <see cref="LayoutPage.Width"/>/<see cref="LayoutPage.Height"/> and every block box refer to
     /// that image (use <see cref="LayoutPage.MapToSource(LayoutBox)"/> to go back). Default false.
-    /// Runs after orientation correction when both are enabled. Pure ImageSharp, ~20-100 ms per page.
+    /// Runs after orientation correction when both are enabled. Pure EasyImageSharp, ~20-100 ms per page.
     /// </summary>
     public bool Deskew { get; init; }
 

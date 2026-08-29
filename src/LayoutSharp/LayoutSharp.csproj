@@ -8,7 +8,7 @@
 		<IsAotCompatible>true</IsAotCompatible>
 		<PackageId>LayoutSharp</PackageId>
 		<Version>1.0.0</Version>
-		<PackageReleaseNotes>1.0.0: first release. Native .NET document layout analysis on ONNX Runtime — detects and classifies page regions (title, section header, text, table, figure, caption, formula, footnote, header/footer, page number, seal) with PP-DocLayout (Apache-2.0; plus-L / M / S variants, checksum-verified download on first use), orders them with XY-cut reading order, and returns a typed Document → Page → Block graph with JSON, plain-text and Markdown export. Text recognition is pluggable via ITextRecognizer (bring your own OCR — EasyOcrSharp, Tesseract, a cloud API — or run layout-only). Runtime dependencies: Microsoft.ML.OnnxRuntime, SixLabors.ImageSharp and the Microsoft.Extensions DI/logging abstractions. No Python required.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.0.0: first release. Native .NET document layout analysis on ONNX Runtime — detects and classifies page regions (title, section header, text, list, table, figure, caption, formula, footnote, header/footer, page number, seal, checkbox, form, key-value region) with a choice of two Apache-2.0 detectors, checksum-verified download on first use: PP-DocLayoutV3 (default, 25 classes, the one that detects seals, charts and vertical CJK text) and Docling heron (17 classes, faster, adds list/checkbox/form/key-value). Orders regions with XY-cut reading order (or the detector's own), and returns a typed Document → Page → Block graph with JSON, plain-text and Markdown export. Text recognition is pluggable via ITextRecognizer (bring your own OCR — EasyOcrSharp, Tesseract, a cloud API — or run layout-only). Runtime dependencies: Microsoft.ML.OnnxRuntime, EasyImageSharp (MIT, fully managed — no native image codecs) and the Microsoft.Extensions DI/logging abstractions. No Python required.</PackageReleaseNotes>
 		<Authors>Farhan Lodi</Authors>
 		<Description>Native .NET document layout analysis: detect and classify page regions (title, text, table, figure, caption, formula, header/footer…), order them the way a human reads, and optionally OCR text regions through a pluggable recognizer — all on ONNX Runtime, no Python required.</Description>
 		<PackageTags>LayoutAnalysis;DocumentAI;DocumentLayout;ONNX;RT-DETR;PicoDet;PP-DocLayout;DocLayNet;ReadingOrder;OCR;.NET10;AOT</PackageTags>
@@ -33,7 +33,7 @@
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
 		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.29.0" />
-		<PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+		<PackageReference Include="EasyImageSharp" Version="1.0.1" />
 	</ItemGroup>
 
 	<ItemGroup>

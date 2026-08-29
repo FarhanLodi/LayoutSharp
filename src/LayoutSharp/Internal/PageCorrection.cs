@@ -1,7 +1,7 @@
 using LayoutSharp.Models;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
+using EasyImageSharp.Processing;
 
 namespace LayoutSharp.Internal;
 
@@ -15,7 +15,7 @@ namespace LayoutSharp.Internal;
 /// step, <c>W1×H1</c>; swapped when the rotation is 90/270) → <b>corrected</b> (after deskew, the
 /// canvas grows to <c>W2×H2</c> = <see cref="LayoutPage.Width"/>×<see cref="LayoutPage.Height"/>).
 /// Deskew rotates about the upright centre and centres the result on the corrected canvas, which is
-/// exactly what ImageSharp's expanding <c>Rotate</c> does.
+/// exactly what EasyImageSharp's expanding <c>Rotate</c> does.
 /// </remarks>
 internal static class PageCorrection
 {

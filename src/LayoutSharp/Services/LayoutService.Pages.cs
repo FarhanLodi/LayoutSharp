@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using LayoutSharp.Models;
 using Microsoft.Extensions.Logging;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.Formats;
+using EasyImageSharp.PixelFormats;
 
 namespace LayoutSharp.Services;
 
@@ -46,7 +46,7 @@ public sealed partial class LayoutService
         var info = await Image.IdentifyAsync(fullPath, cancellationToken).ConfigureAwait(false);
         GuardFrames(info);
 
-        using var image = await Image.LoadAsync<Rgb24>(FrameDecoderOptions(), fullPath, cancellationToken).ConfigureAwait(false);
+        using var image = await Image.LoadAsync<Rgb24>(fullPath, FrameDecoderOptions(), cancellationToken).ConfigureAwait(false);
         return await RunAllFramesAsync(image, options, cancellationToken).ConfigureAwait(false);
     }
 
@@ -74,7 +74,7 @@ public sealed partial class LayoutService
             GuardFrames(info);
             source.Position = start;
 
-            using var image = await Image.LoadAsync<Rgb24>(FrameDecoderOptions(), source, cancellationToken).ConfigureAwait(false);
+            using var image = await Image.LoadAsync<Rgb24>(source, FrameDecoderOptions(), cancellationToken).ConfigureAwait(false);
             return await RunAllFramesAsync(image, options, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -101,7 +101,7 @@ public sealed partial class LayoutService
         var info = Image.Identify(imageBytes.Span);
         GuardFrames(info);
 
-        using var image = Image.Load<Rgb24>(FrameDecoderOptions(), imageBytes.Span);
+        using var image = Image.Load<Rgb24>(imageBytes.Span, FrameDecoderOptions());
         return await RunAllFramesAsync(image, options, cancellationToken).ConfigureAwait(false);
     }
 
@@ -226,11 +226,20 @@ public sealed partial class LayoutService
         }
     }
 
-    /// <summary>One single-frame clone per frame, owned by the pipeline and disposed once analyzed.</summary>
-    private static IEnumerable<PageInput> EnumerateFrames(Image<Rgb24> image)
+    /// <summary>
+    /// One single-frame clone per frame, owned by the pipeline and disposed once analyzed. Each
+    /// frame is size-guarded on its own dimensions before it is cloned: a multi-frame file may hold
+    /// frames of differing sizes, so the header check in <see cref="GuardFrames"/> — which sees only
+    /// the container's dimensions — is not sufficient on its own.
+    /// </summary>
+    private IEnumerable<PageInput> EnumerateFrames(Image<Rgb24> image)
     {
         for (int i = 0; i < image.Frames.Count; i++)
+        {
+            var frame = image.Frames[i];
+            GuardImageSize(frame.Width, frame.Height);
             yield return new PageInput(image.Frames.CloneFrame(i), i + 1, Owned: true);
+        }
     }
 
     // ---- guards ----
@@ -238,8 +247,8 @@ public sealed partial class LayoutService
     /// <summary>Rejects an over-long or over-sized multi-frame file from its header, before pixels are decoded.</summary>
     private void GuardFrames(ImageInfo info)
     {
-        // Single-frame formats may report no frame metadata at all.
-        int frames = Math.Max(1, info.FrameMetadataCollection.Count);
+        // Single-frame formats may report no frames at all.
+        int frames = Math.Max(1, info.FrameCount);
         if (frames > _options.MaxPages)
         {
             throw new TooManyPagesException(
@@ -247,7 +256,9 @@ public sealed partial class LayoutService
                 "(LayoutServiceOptions.MaxPages). Raise the limit or split the file. This guard bounds the memory and " +
                 "time one call can consume.", _options.MaxPages);
         }
-        GuardImageSize(info.Width, info.Height); // ImageSharp frames share one size
+        // Only the container's dimensions are known from the header; frames may differ in size, so
+        // each one is guarded again in EnumerateFrames before it is decoded into a page.
+        GuardImageSize(info.Width, info.Height);
     }
 
     private void GuardPageCount(int count)
@@ -266,5 +277,5 @@ public sealed partial class LayoutService
     /// slipped past the header check is still bounded, while one frame too many remains detectable.
     /// </summary>
     private DecoderOptions FrameDecoderOptions()
-        => new() { MaxFrames = (uint)Math.Min((long)_options.MaxPages + 1, uint.MaxValue) };
+        => new() { MaxFrames = (int)Math.Min((long)_options.MaxPages + 1, int.MaxValue) };
 }

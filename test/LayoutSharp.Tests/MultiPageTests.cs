@@ -2,11 +2,11 @@ using LayoutSharp.Internal;
 using LayoutSharp.Models;
 using LayoutSharp.Recognition;
 using LayoutSharp.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Gif;
-using SixLabors.ImageSharp.Formats.Tiff;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.Formats;
+using EasyImageSharp.Formats.Gif;
+using EasyImageSharp.Formats.Tiff;
+using EasyImageSharp.PixelFormats;
 using Xunit;
 
 namespace LayoutSharp.Tests;
@@ -438,17 +438,29 @@ public class MultiPageTests
     /// supported"). If this test starts failing after an ImageSharp upgrade, the README caveat can go.
     /// </summary>
     [Fact]
-    public async Task AnalyzeAllFrames_MixedSizeTiff_IsNotSupportedByImageSharp()
+    public async Task AnalyzeAllFrames_MixedSizeTiff_DecodesEveryFrameAtItsOwnSize()
     {
         await using var svc = Create(new PixelKeyedDetector());
         var tiff = HandcraftedTiff((40, 30), (60, 20));
 
-        Assert.Equal(2, Image.Identify(tiff).FrameMetadataCollection.Count);
-        await Assert.ThrowsAsync<NotSupportedException>(() => svc.AnalyzeAllFramesAsync(tiff));
+        Assert.Equal(2, Image.Identify(tiff).FrameCount);
 
-        // Same-size pages built the same way decode fine, so the writer itself is sound.
-        var same = HandcraftedTiff((40, 30), (40, 30));
-        Assert.Equal(2, (await svc.AnalyzeAllFramesAsync(same)).Document.Pages.Count);
+        // Frames of differing sizes decode: each page reports its own dimensions, not the container's.
+        var result = await svc.AnalyzeAllFramesAsync(tiff);
+        Assert.Equal(2, result.Document.Pages.Count);
+        Assert.Equal((40, 30), (result.Document.Pages[0].Width, result.Document.Pages[0].Height));
+        Assert.Equal((60, 20), (result.Document.Pages[1].Width, result.Document.Pages[1].Height));
+    }
+
+    [Fact]
+    public async Task AnalyzeAllFrames_GuardsEachFrameSize_NotJustTheFirst()
+    {
+        // The header check only sees the container's dimensions. A file whose first frame is small
+        // and whose second is oversized must still be rejected, or the pixel guard is bypassable.
+        await using var svc = Create(new PixelKeyedDetector(), options: new LayoutServiceOptions { MaxImagePixels = 2_000 });
+        var tiff = HandcraftedTiff((40, 30), (200, 200));   // 1,200 px then 40,000 px
+
+        await Assert.ThrowsAsync<ImageTooLargeException>(() => svc.AnalyzeAllFramesAsync(tiff));
     }
 
     /// <summary>Minimal little-endian, uncompressed RGB TIFF with one IFD per page (pixel (0,0) red = 1).</summary>

@@ -1,8 +1,8 @@
 using LayoutSharp.Internal;
 using LayoutSharp.Models;
 using LayoutSharp.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
 using Xunit;
 
 namespace LayoutSharp.Tests;
@@ -165,8 +165,8 @@ public class ReadingOrderSourceTests
         using var img = new Image<Rgb24>(100, 100);
         var result = await svc.AnalyzeAsync(img);
 
-        // The scripted service is constructed with default options, i.e. the plus-L spec.
-        Assert.Equal("docling-layout-heron", result.ModelName);
+        // The scripted service is constructed with default options, i.e. the PP-DocLayoutV3 spec.
+        Assert.Equal("PP-DocLayoutV3", result.ModelName);
         Assert.Equal(ReadingOrderSource.XyCut, result.ReadingOrderUsed); // no detections → nothing to order
     }
 

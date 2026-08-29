@@ -1,6 +1,6 @@
 using LayoutSharp.Internal;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
 using Xunit;
 
 namespace LayoutSharp.Tests;
@@ -77,7 +77,7 @@ public class OrientationClassifierTests
     {
         // A tall page: white with a red band down the middle third. After short-side-256 + crop-224
         // the centre pixel must be red and the corners white — a stretch-to-224 would keep the edges.
-        using var page = new Image<Rgb24>(400, 1600, Color.White);
+        using var page = new Image<Rgb24>(400, 1600, Color.White.ToPixel<Rgb24>());
         for (int y = 0; y < page.Height; y++)
             for (int x = 150; x < 250; x++)
                 page[x, y] = new Rgb24(255, 0, 0);

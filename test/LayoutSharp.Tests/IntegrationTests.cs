@@ -1,8 +1,8 @@
 using LayoutSharp.Models;
 using LayoutSharp.Recognition;
 using LayoutSharp.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -307,7 +307,7 @@ public class ModelVariantIntegrationTests
         await using var offline = new LayoutService(new LayoutServiceOptions { Offline = true });
         var result = await offline.AnalyzeAsync(IntegrationTests.AssetPath("structure_sample.png"));
 
-        Assert.Equal(LayoutModel.DoclingLayoutHeron, result.Model);
+        Assert.Equal(LayoutModel.PPDocLayoutV3, result.Model);
         Assert.NotEmpty(result.Document.Pages[0].Blocks);
     }
 }

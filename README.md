@@ -4,7 +4,7 @@
 
 # LayoutSharp
 
-### Document layout analysis for .NET — Docling region detection and reading order, running natively on ONNX Runtime. **No Python. No OCR lock-in.**
+### Document layout analysis for .NET — find every region on a page, classify it, and read it in order. Natively on ONNX Runtime. **No Python. No OCR lock-in.**
 
 [![NuGet](https://img.shields.io/nuget/v/LayoutSharp.svg?label=NuGet&color=004880&logo=nuget)](https://www.nuget.org/packages/LayoutSharp)
 [![Downloads](https://img.shields.io/nuget/dt/LayoutSharp.svg?label=Downloads&color=success)](https://www.nuget.org/packages/LayoutSharp)
@@ -19,13 +19,18 @@
 
 ---
 
-LayoutSharp turns a page image into a **typed, reading-ordered block graph**: it runs IBM Docling's
-**`docling-layout-heron`** detector (RT-DETRv2, exported to ONNX, executed through
-`Microsoft.ML.OnnxRuntime`) to find and classify every region on the page — title, section header,
-text, list item, table, figure, caption, formula, footnote, header, footer, checkbox, form,
-key-value region — then orders them the way a human reads. Multi-page documents, page orientation
-and skew correction, and pluggable table / formula recognition are built in. Everything runs
-locally in a small managed package: no Python, no PyTorch, and **nothing ever leaves the machine**.
+LayoutSharp turns a page image into a **typed, reading-ordered block graph**. It runs a document
+layout detector through `Microsoft.ML.OnnxRuntime` to find and classify every region on the page —
+title, section header, text, table, figure, caption, formula, footnote, header, footer, page number,
+**seal**, chart, list item, checkbox, form, key-value region — then orders them the way a human
+reads.
+
+Two detectors ship, both Apache-2.0, and they cover different ground: **`PP-DocLayoutV3`** (the
+default) reads stamps and red chops, charts, page numbers and vertical CJK text; **`heron`** reads
+form furniture — checkboxes, key-value pairs and list items. Multi-page documents, orientation and
+skew correction, and pluggable OCR / table / formula recognition are built in. Everything runs
+locally in a small managed package with no native binaries: no Python, no PyTorch, and **nothing
+ever leaves the machine**.
 
 ```csharp
 await using var layout = new LayoutService();
@@ -38,33 +43,33 @@ foreach (var block in result.Document.Pages[0].Blocks)
 
 | | |
 |---|---|
-| 🧱 **16 region types** | Title, section header, text, list, table, figure, caption, formula, footnote, page header, page footer, page number, seal, checkbox, form, key-value region — normalized from the detector's 17 raw labels, with the raw label preserved on every block |
+| 🧱 **16 region types** | Title, section header, text, list, table, figure, caption, formula, footnote, page header, page footer, page number, seal, checkbox, form, key-value region — normalized from the detector's raw labels (25 for the default model, 17 for heron), with the raw label preserved on every block |
 | 📖 **Reading order** | Recursive XY-cut with the widest-gap rule, tolerant of touching boxes; page headers first, footers and page numbers last — or the model's own order when a detector emits one |
 | 📄 **Multi-page** | `AnalyzePagesAsync` for rasterized page sequences and `AnalyzeAllFramesAsync` for multi-page TIFF / animated GIF / WebP — one document, pages 1..N, optionally analyzed in parallel |
 | 🧭 **Page correction** | Opt-in 0/90/180/270 orientation classification and small-angle deskew, both applied *before* detection, with `MapToSource` to map boxes back to your image |
 | 🔌 **Bring your own OCR** | One-method `ITextRecognizer` fills in block text — plug in [EasyOcrSharp](https://github.com/FarhanLodi/EasyOcrSharp), Tesseract, a cloud API, or nothing at all |
 | 🧮 **Tables & formulas** | Optional `ITableRecognizer` → `TableStructure` (grid / HTML / Markdown / CSV) and `IFormulaRecognizer` → LaTeX, filled in on the blocks LayoutSharp located |
-| 🎚️ **One model, or yours** | `DoclingLayoutHeron` (Apache-2.0) out of the box, or point `CustomLayoutModel` at any PaddleDetection / DETR / YOLO-end-to-end ONNX export |
+| 🎚️ **Two models, or yours** | `PPDocLayoutV3` (default) and `DoclingLayoutHeron`, both Apache-2.0 — or point `CustomLayoutModel` at any PaddleDetection / DETR / YOLO-end-to-end ONNX export |
 | 📦 **Tiny package** | Four small dependencies; models download on demand, SHA-256 verified fail-closed, and cache locally — nothing is bundled |
 | 🔒 **Verified & private** | HTTPS-only downloads with retries, offline mode for air-gapped hosts, decompression-bomb and page-count guards on input |
 | 🧩 **Flexible input** | File / `Stream` / `byte[]` / `ReadOnlyMemory<byte>` / `Image<Rgb24>` / page sequences |
 | 📤 **Structured output** | `Document → Page → Block` records with **JSON** (source-generated, round-trips), **plain text** and **Markdown** export |
-| ⚡ **Fast** | ~0.5 s per page on a laptop CPU (warm), optional CUDA, thread-safe singleton, concurrent page and region recognition |
+| ⚡ **Fast** | ~0.8 s per page on a laptop CPU (warm), or ~0.5 s with `DoclingLayoutHeron`; optional CUDA, thread-safe singleton, concurrent page and region recognition |
 | 🛠️ **Modern .NET** | .NET 10, `IsAotCompatible`, DI-ready (`AddLayoutSharp()`), typed exceptions, `ILogger` progress |
 | ⚖️ **Permissive end-to-end** | MIT library, Apache-2.0 model — no AGPL YOLO weights |
 
 ## 🆚 Why LayoutSharp?
 
-|  | **LayoutSharp** | EasyOcrSharp `AnalyzeDocumentAsync` | Python Docling / PaddleX / LayoutParser | Cloud Document AI |
-|---|:---:|:---:|:---:|:---:|
-| **Runtime** | Pure .NET + ONNX | Pure .NET + ONNX | Python + PyTorch/Paddle | Remote HTTP service |
-| **Scope** | Layout, reading order, page correction; OCR / tables / formulas pluggable | Full PP-StructureV3: layout, OCR, **tables → HTML**, formulas, seals | Layout (+ OCR add-ons) | Everything, per page |
-| **Footprint** | 🟢 4 small deps, no bundled models | 🟡 OCR + PDF + barcode stack | 🔴 pip + framework | n/a |
-| **Choose your OCR** | 🟢 any `ITextRecognizer` | 🟡 built-in engines | 🟡 built-in | 🔴 fixed |
-| **Privacy** | 🟢 100% offline | 🟢 100% offline | 🟢 offline | 🔴 data leaves the machine |
-| **Model license** | 🟢 Apache-2.0 | 🟢 Apache-2.0 | 🟡 varies (YOLO variants AGPL) | n/a |
-| **Native AOT / trimming** | 🟢 yes | 🟢 yes | n/a | n/a |
-| **Cost** | 🟢 free (MIT) | 🟢 free (MIT) | 🟢 free | 🔴 per-page |
+|  | **LayoutSharp** | Python Docling / PaddleX / LayoutParser | Cloud Document AI |
+|---|:---:|:---:|:---:|
+| **Runtime** | Pure .NET + ONNX | Python + PyTorch/Paddle | Remote HTTP service |
+| **Scope** | Layout (incl. **seals**), reading order, page correction; OCR / tables / formulas pluggable | Layout (+ OCR add-ons) | Everything, per page |
+| **Footprint** | 🟢 4 small deps, no bundled models, no native binaries | 🔴 pip + framework | n/a |
+| **Choose your OCR** | 🟢 any `ITextRecognizer` | 🟡 built-in | 🔴 fixed |
+| **Privacy** | 🟢 100% offline | 🟢 offline | 🔴 data leaves the machine |
+| **Model license** | 🟢 Apache-2.0 | 🟡 varies (YOLO variants AGPL) | n/a |
+| **Native AOT / trimming** | 🟢 yes | n/a | n/a |
+| **Cost** | 🟢 free (MIT) | 🟢 free | 🔴 per-page |
 
 > **Rule of thumb:** need boxes, classes and reading order with the OCR engine of *your* choice (or none) — LayoutSharp.
 > Need tables recovered as HTML, formulas as LaTeX and OCR in one call — EasyOcrSharp's `AnalyzeDocumentAsync`.
@@ -79,7 +84,7 @@ foreach (var block in result.Document.Pages[0].Blocks)
 dotnet add package LayoutSharp
 ```
 
-The detector (~172 MB) is downloaded on first use, SHA-256 verified, and cached under
+The detector (~124 MB) is downloaded on first use, SHA-256 verified, and cached under
 `%LocalAppData%/LayoutSharp/models` (override with `LAYOUTSHARP_CACHE`). The optional orientation
 classifier adds 6.7 MB, and only when you enable it. For NVIDIA GPU acceleration add
 `Microsoft.ML.OnnxRuntime.Gpu` to your application and set `UseGpu = true` (see
@@ -90,7 +95,7 @@ classifier adds 6.7 MB, and only when you enable it. For NVIDIA GPU acceleration
 ```csharp
 using LayoutSharp.Services;
 
-await using var layout = new LayoutService();          // docling-layout-heron on CPU, layout-only
+await using var layout = new LayoutService();          // PP-DocLayoutV3 on CPU, layout-only
 
 var result = await layout.AnalyzeAsync("page.png");
 var page = result.Document.Pages[0];
@@ -102,34 +107,44 @@ foreach (var block in page.Blocks)
 Console.WriteLine(result.Document.ToJson());           // the whole structured document
 ```
 
-On a 762×1000 scanned form (`dotnet run --project test/LayoutSharp.Demo -- test/assets/structure_sample.png`).
-The reported duration is the **first** call in a fresh process — it includes loading the 172 MB model
-and creating the ONNX session; subsequent pages take ~0.5 s (see [Performance](#performance)), and
-`WarmUpAsync()` moves that cost off the first request:
+Run it on the sample form that ships with the repo — `dotnet run --project test/LayoutSharp.Demo -- test/assets/structure_sample.png`:
 
 ```
-Analyzed test/assets/structure_sample.png (762×1000) with DoclingLayoutHeron on CPU: 42 blocks in 1567 ms
+Analyzed test/assets/structure_sample.png (762×1000) with PPDocLayoutV3 on CPU: 19 blocks in 2185 ms
 
-#0  Figure          95 %  [23,34 67×65]  (picture)
-#1  SectionHeader   84 %  [144,47 397×17]  (section_header)
-#2  SectionHeader   68 %  [122,78 442×14]  (section_header)
-#3  Text            74 %  [124,94 436×15]  (text)
-#4  Figure          97 %  [589,33 75×67]  (picture)
-#5  SectionHeader   70 %  [228,120 229×14]  (section_header)
-#6  Form            96 %  [11,139 673×750]  (form)
-#7  Text            82 %  [497,150 130×13]  (text)
-#8  Text            83 %  [12,166 210×14]  (text)
-…
-#26 List            84 %  [33,503 327×14]  (list_item)
-#27 List            78 %  [34,531 223×14]  (list_item)
-…
-#32 Checkbox        91 %  [411,645 69×16]  (checkbox_unselected)
-#33 Checkbox        92 %  [306,645 40×17]  (checkbox_unselected)
-#34 Checkbox        91 %  [363,646 33×16]  (checkbox_unselected)
-…
-#40 PageFooter      63 %  [263,877 152×24]  (page_footer)
-#41 PageFooter      69 %  [634,774 20×113]  (page_footer)
+#0  PageHeader      88 %  [23,32 72×68]     (header_image)
+#1  PageHeader      64 %  [590,32 74×69]    (header_image)
+#2  Title           89 %  [142,45 402×23]   (doc_title)
+#3  Title           90 %  [119,76 447×34]   (doc_title)
+#4  SectionHeader   85 %  [226,118 234×18]  (paragraph_title)
+#5  Text            67 %  [9,164 327×16]    (text)
+#6  Text            67 %  [8,192 422×16]    (text)
+#7  Text            52 %  [8,220 423×17]    (text)
+#8  Text            57 %  [495,149 134×15]  (text)
+#9  Text            61 %  [454,151 218×112] (text)
+#10 SectionHeader   79 %  [9,278 350×15]    (paragraph_title)
+#11 Text            92 %  [16,307 667×127]  (text)
+#12 SectionHeader   71 %  [9,476 294×15]    (paragraph_title)
+#13 Text            66 %  [31,501 331×17]   (text)
+#14 Text            78 %  [31,529 228×17]   (text)
+#15 Text            83 %  [10,551 647×53]   (text)
+#16 Text            76 %  [633,772 23×118]  (aside_text)
+#17 PageFooter      55 %  [11,647 89×14]    (footer)
+#18 PageFooter      71 %  [54,876 168×14]   (footer)
 ```
+
+Note the raw labels in the last column: `aside_text` for the rotated marginal note down the right
+edge, `header_image` for the two logos, `doc_title` for the two-line title. The normalized `Type` is
+what you branch on; the raw label is there when you need the detail.
+
+That 2185 ms is the **first** call in a fresh process — it includes creating the ONNX session.
+Warm pages take ~0.8 s (see [Performance](#performance)), and `WarmUpAsync()` moves the one-off cost
+off the first request.
+
+Add `--heron` to run the same page through `DoclingLayoutHeron` instead, which returns 42 blocks
+rather than 19 — it splits individual form fields into their own boxes and tags the checkboxes and
+the enclosing form, where V3 groups text into full lines and calls the logos page furniture. Neither
+is wrong; they are different taxonomies. [Block types](#block-types) compares them label by label.
 
 ## 📦 The result model
 
@@ -181,11 +196,11 @@ public sealed record LayoutBlock
 await layout.AnalyzeAsync("page.png");                    // file
 await layout.AnalyzeAsync(stream);                        // Stream (non-seekable streams are buffered)
 await layout.AnalyzeAsync(bytes);                         // byte[] or ReadOnlyMemory<byte>
-await layout.AnalyzeAsync(image);                         // SixLabors Image<Rgb24> — caller keeps ownership
+await layout.AnalyzeAsync(image);                         // EasyImageSharp Image<Rgb24> — caller keeps ownership
 ```
 
 All overloads run the same pipeline and produce identical results for the same pixels. Any format
-ImageSharp decodes (PNG, JPEG, BMP, TIFF, WebP, GIF, …) is accepted; RGBA and grayscale are converted.
+EasyImageSharp decodes (PNG, JPEG, BMP, TIFF, WebP, GIF, TGA, QOI, …) is accepted; RGBA and grayscale are converted.
 Multi-frame files are analyzed **first frame only** by these overloads — see below.
 
 ### Multi-page documents
@@ -211,8 +226,8 @@ var result = await layout.AnalyzePagesAsync(pages);  // IEnumerable<Image<Rgb24>
 | Reading order | restarts at `0` on every page (`ReadingOrder` is per page) |
 | `Duration` | total for the whole call; per-page timings are logged at `Debug` level |
 | Exports | `ToJson()` / `FromJson()` keep every page; `ToPlainText()` separates pages with a blank line, `ToMarkdown()` with a `---` rule |
-| Guard | more than `LayoutServiceOptions.MaxPages` (default 500) pages throws `TooManyPagesException` — multi-frame files are rejected from their header, before decoding |
-| Guard | `MaxImagePixels` applies to every page |
+| Guard | more than `LayoutServiceOptions.MaxPages` (default 500) pages throws `TooManyPagesException` — multi-frame files are rejected from their frame count first, before decoding |
+| Guard | `MaxImagePixels` (default 100 MP) is checked against **every** page and every frame individually |
 
 **Pages in parallel.** `PageParallelism` analyzes several pages at once (the ONNX session is
 thread-safe); results stay in page order either way:
@@ -233,9 +248,10 @@ rasterizer can `yield return` one page at a time and dispose it as the iterator 
 single page in memory no matter how long the document is. With `PageParallelism > 1` several pages
 are pulled ahead, so keep them alive until the call completes.
 
-> **Frames must share one size.** ImageSharp decodes all frames of a file at once and requires them
-> to have identical dimensions; a multi-page TIFF with differently sized pages throws
-> `NotSupportedException`. Rasterize such documents page by page and use `AnalyzePagesAsync`.
+> **All frames are decoded at once.** The whole file is held in memory for the duration of the call,
+> so for untrusted input bound it with `MaxPages` and `MaxImagePixels` (applied to *every* frame, not
+> just the first). For very long documents prefer `AnalyzePagesAsync`, which pulls one page at a time.
+> Frames may differ in size — each is analyzed at its own dimensions.
 
 ### PDFs
 
@@ -247,8 +263,8 @@ stream its pages into `AnalyzePagesAsync`:
 // dotnet add package PDFtoImage    (MIT — PDFium + SkiaSharp)
 using PDFtoImage;
 using SkiaSharp;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
 
 // One page at a time: each page is disposed as soon as the next is pulled
 // (valid because PageParallelism defaults to 1 — see "Streaming" above).
@@ -344,7 +360,7 @@ await using var layout = new LayoutService(new LayoutServiceOptions
 
 var result = await layout.AnalyzeAsync("scan.png", new LayoutAnalysisOptions
 {
-    Deskew = true,          // straighten small tilts (pure ImageSharp, ~20–100 ms/page)
+    Deskew = true,          // straighten small tilts (pure EasyImageSharp, ~20–100 ms/page)
     DeskewMaxAngle = 15,    // search window, ±degrees
 });
 
@@ -368,7 +384,7 @@ var (rotation, confidence) = await layout.ClassifyOrientationAsync(image);   // 
 **Deskew** estimates the tilt with a projection-profile search (downscale → Otsu → maximize the
 sharpness of the horizontal ink profile over ±`DeskewMaxAngle`, 0.5° then 0.1° steps) and rotates the
 page straight only when the estimate is reliable — |angle| ≥ 0.5° with a clear sharpness gain — so
-already-straight pages are never touched. It is ImageSharp-only: no native dependency, no model.
+already-straight pages are never touched. It is EasyImageSharp-only: no native dependency, no model.
 The same routine is public for callers who want to reproduce the corrected image:
 
 ```csharp
@@ -412,32 +428,46 @@ the identity, so it is always safe to call.
 
 ### Block types
 
-| `LayoutBlockType` | Raw detector labels | Text-bearing | Notes |
-|---|---|:---:|---|
-| `Title` | `title` | ✅ | Document title |
-| `SectionHeader` | `section_header` | ✅ | Section / sub-section heading |
-| `Text` | `text`, `document_index`, `code` | ✅ | Body text (raw label tells them apart) |
-| `List` | `list_item` | ✅ | One list item per block |
-| `Table` | `table` | — | Located; parsed by an `ITableRecognizer` if you supply one |
-| `Figure` | `picture` | — | Kept as a region |
-| `Caption` | `caption` | ✅ | Figure / table caption |
-| `Formula` | `formula` | — | Located; LaTeX by an `IFormulaRecognizer` if you supply one |
-| `Footnote` | `footnote` | ✅ | |
-| `PageHeader` | `page_header` | ✅ | Pinned first in reading order |
-| `PageFooter` | `page_footer` | ✅ | Pinned last |
-| `PageNumber` | — | ✅ | Reserved: heron folds page numbers into header/footer |
-| `Seal` | — | — | Reserved: not emitted by the shipped detector |
-| `Checkbox` | `checkbox_selected`, `checkbox_unselected` | — | The raw label carries the state |
-| `Form` | `form` | — | Container; its fields are reported as their own blocks |
-| `KeyValueRegion` | `key_value_region` | ✅ | Label : value pairs on invoices and forms |
-| `Other` | anything unmapped | — | Not produced by the shipped model |
+Both shipped models normalize into the same 16 types, but they do not cover the same ground — the
+two taxonomies are complementary rather than one being a superset. A `—` means that model has no
+label for the type and will never emit it.
+
+| `LayoutBlockType` | `PPDocLayoutV3` labels (default) | `DoclingLayoutHeron` labels | Text-bearing | Notes |
+|---|---|---|:---:|---|
+| `Title` | `doc_title` | `title` | ✅ | Document title |
+| `SectionHeader` | `paragraph_title` | `section_header` | ✅ | Section / sub-section heading |
+| `Text` | `text`, `abstract`, `content`, `reference`, `reference_content`, `algorithm`, `aside_text`, `vertical_text` | `text`, `document_index`, `code` | ✅ | Body text (raw label tells them apart) |
+| `Table` | `table` | `table` | — | Located; parsed by an `ITableRecognizer` if you supply one |
+| `Figure` | `image`, `chart` | `picture` | — | Kept as a region; only V3 separates charts from images |
+| `Caption` | `figure_title`, `vision_footnote` | `caption` | ✅ | Figure / table caption |
+| `Formula` | `display_formula`, `inline_formula`, `formula_number` | `formula` | — | Located; LaTeX by an `IFormulaRecognizer` if you supply one |
+| `Footnote` | `footnote` | `footnote` | ✅ | |
+| `PageHeader` | `header`, `header_image` | `page_header` | ✅ | Pinned first in reading order |
+| `PageFooter` | `footer`, `footer_image` | `page_footer` | ✅ | Pinned last |
+| `PageNumber` | `number` | — | ✅ | heron folds page numbers into header / footer |
+| `Seal` | `seal` | — | — | Stamps and red chops on contracts, invoices, certificates |
+| `List` | — | `list_item` | ✅ | One list item per block; V3 reports list text as `text` |
+| `Checkbox` | — | `checkbox_selected`, `checkbox_unselected` | — | The raw label carries the state |
+| `Form` | — | `form` | — | Container; its fields are reported as their own blocks |
+| `KeyValueRegion` | — | `key_value_region` | ✅ | Label : value pairs on invoices and forms |
+| `Other` | anything unmapped | anything unmapped | — | Not produced by either shipped model |
+
+**Choosing between them.** V3 is the default because seals, charts, page numbers and vertical CJK
+text are unavailable at any confidence threshold with heron, and because it holds up far better on
+skewed scans. If your documents are **forms** — checkboxes, field/value pairs, list items — heron's
+taxonomy is the better fit and is one line away:
+
+```csharp
+await using var layout = new LayoutService(
+    new LayoutServiceOptions { Model = LayoutModel.DoclingLayoutHeron });
+```
 
 `type.IsTextBearing()` says whether a block is sent to the recognizer; `type.IsPageFurniture()`
 identifies running heads, footers and page numbers. The raw label is always on
-`block.RawClassName`, so `checkbox_selected` vs `checkbox_unselected`, or `code` vs plain `text`,
-stays available even though both normalize to one type. Custom models map their own labels through
-the same taxonomy (plus the common PP-DocLayout and YOLO vocabularies), so `PageNumber` and `Seal`
-are produced when a detector emits them.
+`block.RawClassName`, so `checkbox_selected` vs `checkbox_unselected`, `chart` vs `image`, or `code`
+vs plain `text`, stays available even though each pair normalizes to one type. Custom models map
+their own labels through the same taxonomy (plus the common YOLO vocabularies), so every type above
+is produced when a detector emits a label for it.
 
 ### Reading order
 
@@ -556,20 +586,34 @@ text calls share `RecognitionParallelism`. The EasyOcrSharp sample wires all thr
 
 | `LayoutModel` | Backbone | Input | Classes | Download | License |
 |---|---|:---:|:---:|:---:|:---:|
-| `DoclingLayoutHeron` **(default)** | RT-DETRv2 / ResNet-50 | 640×640 | 17 | ~172 MB | Apache-2.0 |
+| `PPDocLayoutV3` **(default)** | RT-DETR-L / PP-HGNetV2 | 800×800 | 25 | ~124 MB | Apache-2.0 |
+| `DoclingLayoutHeron` | RT-DETRv2 / ResNet-50 | 640×640 | 17 | ~164 MB | Apache-2.0 |
 | `Custom` | yours | yours | yours | — (local file) | yours |
 
 ```csharp
-await using var layout = new LayoutService();   // DoclingLayoutHeron — nothing to configure
+await using var layout = new LayoutService();   // PPDocLayoutV3 — nothing to configure
 ```
 
-The shipped detector is IBM Docling's [`docling-layout-heron`](https://huggingface.co/docling-project/docling-layout-heron)
-(**Apache-2.0**), an RT-DETRv2 with a ResNet-50 backbone trained on ~150 k pages (DocLayNet,
-DocLayNet-v2, WordScape). It emits the 11 DocLayNet classes plus Docling's form extensions
-(document index, code, checkbox selected/unselected, form, key-value region) — the strongest
-DocLayNet-taxonomy detector available under a permissive license. It is exported to ONNX with
-`training/export_onnx.py` in this repository (opset 17, input `pixel_values [1,3,640,640]`, outputs
-`logits` + `pred_boxes`) and hosted on Hugging Face; the download is SHA-256 verified fail-closed.
+**`PPDocLayoutV3`** (Baidu PaddleX, **Apache-2.0**) is the default. Its 25 categories cover what a
+DocLayNet-taxonomy model structurally cannot: `seal` (stamps and red chops on contracts, invoices
+and certificates), `chart` as distinct from `image`, `vertical_text` for CJK, `number` for page
+numbers, and separate `abstract` / `reference` / `algorithm` regions. The export also carries a
+per-region reading-order key, so `ReadingOrderSource.Model` works without falling back to geometric
+XY-cut, and it degrades far better on rotated and skewed pages. LayoutSharp reproduces PaddleX's own
+preprocessing exactly — `Resize(target_size: [800, 800], keep_ratio: false, interp: 2)` (bicubic
+stretch) → `NormalizeImage(norm_type: none)` (a plain `1/255`) → `Permute` — as declared in the
+model's `inference.yml`. The graph's `[M,200,200]` mask head is not fetched, so it costs nothing.
+
+**`DoclingLayoutHeron`** (IBM, **Apache-2.0**) is an RT-DETRv2 with a ResNet-50 backbone trained on
+~150 k pages (DocLayNet, DocLayNet-v2, WordScape). It emits the 11 DocLayNet classes plus Docling's
+form extensions — document index, code, checkbox selected/unselected, form, key-value region —
+none of which V3 has a label for, which makes it the better choice for **form** documents. It is
+~1.5× faster per page and holds up better on heavy blur and very low resolution; on skewed scans
+enable `Deskew`. It is exported to ONNX with `training/export_onnx.py` in this repository (opset 17,
+input `pixel_values [1,3,640,640]`, outputs `logits` + `pred_boxes`).
+
+Both are hosted on Hugging Face and downloaded on first use, SHA-256 verified fail-closed. See
+[Block types](#block-types) for the full label-by-label comparison.
 
 LayoutSharp is MIT and deliberately uses only permissively-licensed models — the higher-scoring
 Ultralytics-YOLO DocLayNet detectors are AGPL/GPL and are not an option for an MIT package.
@@ -683,7 +727,7 @@ var ticked = page.Blocks.Where(b => b.RawClassName == "checkbox_selected"); // f
 services.AddSingleton<ITextRecognizer, MyRecognizer>();   // optional — omit for layout-only
 services.AddLayoutSharp(o =>
 {
-    o.Model = LayoutModel.DoclingLayoutHeron;
+    o.Model = LayoutModel.PPDocLayoutV3;
     o.ModelCachePath = "/var/cache/layoutsharp";
     o.UseGpu = false;
     o.MaxImagePixels = 50_000_000;
@@ -717,8 +761,8 @@ runs on CPU, and `LayoutResult.UsedGpu` tells you what actually happened.
 
 | Guard | Default | What it does |
 |---|---|---|
-| `MaxImagePixels` | 100 MP | Rejects oversized inputs **before decoding** (`ImageTooLargeException`) — decompression-bomb / pixel-flood protection |
-| `MaxPages` | 500 | Bounds a multi-page call (`TooManyPagesException`); multi-frame files are rejected from their header, before pixels are decoded |
+| `MaxImagePixels` | 100 MP | Rejects oversized inputs **before decoding** (`ImageTooLargeException`) — decompression-bomb / pixel-flood protection. Enforced on **every frame** of a multi-frame file, not just the first, so an oversized later frame cannot hide behind a small one |
+| `MaxPages` | 500 | Bounds a multi-page call (`TooManyPagesException`); multi-frame files are rejected from their frame count first, before pixels are decoded |
 | SHA-256 verification | always | Every download is checked against a pinned digest and **discarded on mismatch** (`ModelChecksumException`) |
 | HTTPS-only | always | Plain-HTTP mirrors are refused (loopback allowed for local mirrors) |
 | Retries | 3, back-off | Transient failures retried; definitive 4xx fail fast (`ModelDownloadException`) |
@@ -733,7 +777,7 @@ recognition fans out only as far as `RecognitionParallelism` (and `PageParalleli
 ```csharp
 // Build / bake step (connected):
 await using (var l = new LayoutService(new LayoutServiceOptions { ModelCachePath = "/models" }))
-    await l.WarmUpAsync();                          // downloads + verifies docling-layout-heron
+    await l.WarmUpAsync();                          // downloads + verifies the selected detector
 
 // Production (air-gapped):
 new LayoutService(new LayoutServiceOptions { ModelCachePath = "/models", Offline = true });
@@ -768,19 +812,26 @@ Argument problems throw the usual `ArgumentException` family; a disposed service
 Measured on an **AMD Ryzen 5 4600H** (12 logical cores, CPU only, ONNX Runtime 1.29), warm session,
 762×1000 page:
 
+| Stage | `PPDocLayoutV3` (default) | `DoclingLayoutHeron` |
+|---|---|---|
+| `AnalyzeAsync(path)`, warm | **~780–880 ms / page** | **~510–550 ms / page** |
+| Session creation (once per service) | ~1.1–1.4 s | ~0.9–1.4 s |
+
+Best-of-20 to p25 on an otherwise idle machine; this laptop throttles under sustained load, and the
+median over a long run drifts 15–25 % above these figures. V3 costs roughly **1.5×** heron per page —
+it runs at 800×800 rather than 640×640, and its decoder head is heavier. Inference dominates either
+way; for heron the end-to-end figure breaks down as:
+
 | Stage | Cost | Notes |
 |---|---|---|
-| Analysis, warm | **~500–550 ms / page** | end-to-end `AnalyzeAsync` |
 | ├─ inference | ~490–530 ms | ~96% of the total — the model is the workload |
 | ├─ preprocessing | 8–16 ms | resize + tensor fill |
 | └─ decode of detections | < 2 ms | |
-| PNG decode | 19–89 ms | depends on page size |
-| Session creation | ~0.9–1.3 s | once per service |
-| First analysis after that | ~875 ms | cold kernels |
+| PNG decode | 19–89 ms | depends on page size; included in the figures above |
 
 `WarmUpAsync()` moves both one-off costs off the first request. The detector's cost is fixed per page
-(the image is stretched to 640×640), so a 12 MP scan costs about the same as a 1 MP one apart from
-decode time. Recognition time is entirely your recognizer's; use `RecognitionParallelism` with a
+(the image is stretched to the model's square input), so a 12 MP scan costs about the same as a 1 MP
+one apart from decode time. Recognition time is entirely your recognizer's; use `RecognitionParallelism` with a
 thread-safe one.
 
 Sessions are created with `GraphOptimizationLevel.ORT_ENABLE_ALL` and `ExecutionMode.ORT_SEQUENTIAL`,
@@ -818,19 +869,20 @@ steps 1–3 entirely and are loaded from their path.
 
 - **PDFs need a rasterizer.** LayoutSharp analyzes images, not PDFs; render pages with PDFtoImage or
   Docnet.Core (both MIT) and hand them to `AnalyzePagesAsync` — see [PDFs](#pdfs). Multi-page TIFFs
-  and animated GIF/WebP are handled directly by `AnalyzeAllFramesAsync`, as long as every frame has
-  the same size.
-- **Fixed detector resolution.** The page is stretched to 640×640, so extremely dense pages (a
-  photographed newspaper spread, a full-page dense table) can lose small regions or merge neighbours.
-  Crop and analyze the region of interest when a page is that busy.
+  and animated GIF/WebP are handled directly by `AnalyzeAllFramesAsync`, including files whose frames
+  differ in size.
+- **Fixed detector resolution.** The page is stretched to the model's square input (800×800 for the
+  default, 640×640 for heron), so extremely dense pages — a photographed newspaper spread, a
+  full-page dense table — can lose small regions or merge neighbours. Crop and analyze the region of
+  interest when a page is that busy.
 - **Page correction is opt-in and heuristic.** Orientation is a 4-way classifier on a 224×224 centre
   crop: very elongated pages (receipts) and text-free pages can be misread, and a wrong 90°/180° turn
   is expensive downstream — hence the confidence gate. Deskew assumes horizontal text lines; pages
   dominated by diagrams, vertical CJK text or tables tilted differently from the text can produce a
   confidently wrong angle. Both are off by default.
 - **Tables and formulas are located, not parsed — unless you plug something in.** Supply an
-  `ITableRecognizer` / `IFormulaRecognizer` (EasyOcrSharp's `AnalyzeDocumentAsync` is bridged in the
-  sample), or feed the crops to a parser of your choice.
+  `ITableRecognizer` / `IFormulaRecognizer` — the [sample](samples/LayoutSharp.EasyOcrSample) wires
+  both up against EasyOcrSharp — or feed the crops to a parser of your choice.
 - **Reading order assumes an upright, axis-aligned page.** Correct rotation and skew first, or
   columns whose boxes overlap will be read row by row.
 
@@ -881,33 +933,11 @@ If LayoutSharp saves you time, consider supporting development:
 
 - 💳 **PayPal** — [paypal.me/FarhanLodi](https://paypal.me/FarhanLodi)
 - 📱 **UPI (India)** — `farhanlodi5@oksbi`
-- 🏦 **Bank transfer (USD)** — details below
+- 🏦 **Bank transfer (USD / SWIFT)** — see
+  [Donation.md](https://github.com/FarhanLodi/LayoutSharp/blob/main/Donation.md)
 
-<details>
-<summary><b>USD bank transfer details (Wise)</b></summary>
-
-<br>
-
-USD account details for Farhan Lodi on Wise. Sending from a bank in the US? Use these details for a
-domestic transfer. Sending from anywhere else? Make an international SWIFT transfer.
-
-| Field | Value |
-|---|---|
-| Name | Farhan Lodi |
-| Account type | Deposit |
-| Routing number (wire and ACH) | `084009519` |
-| Account number | `420927686563885` |
-| SWIFT/BIC | `TRWIUS35XXX` |
-| Bank address | Wise US Inc, 108 W 13th St, Wilmington, DE, 19801, United States |
-
-Use the routing and account numbers when sending from the US, and the SWIFT/BIC when sending from
-outside the US.
-
-</details>
-
-📧 Need more details, a different payment method, or have a question? Email
-[farhanlodi31@gmail.com](mailto:farhanlodi31@gmail.com). All options are also listed in
-[Donation.md](https://github.com/FarhanLodi/LayoutSharp/blob/main/Donation.md).
+📧 Need a different payment method, or have a question? Email
+[farhanlodi31@gmail.com](mailto:farhanlodi31@gmail.com).
 
 ## 📬 Contact
 
@@ -917,18 +947,20 @@ For work inquiries, collaboration, feature requests, or any questions, reach out
 
 ## 📄 License
 
-MIT — see [LICENSE](https://github.com/FarhanLodi/LayoutSharp/blob/main/LICENSE). The
-`docling-layout-heron` detector and the `PP-LCNet_x1_0_doc_ori` orientation classifier are
-Apache-2.0 and retain their own licenses; a model you load through `CustomLayoutModel` carries
-whatever license it came with.
+MIT — see [LICENSE](https://github.com/FarhanLodi/LayoutSharp/blob/main/LICENSE).
+
+The models are **not** MIT and retain their own terms: the `PP-DocLayoutV3` detector and the
+`PP-LCNet_x1_0_doc_ori` orientation classifier are Apache-2.0 (Baidu PaddleX), and
+`docling-layout-heron` is Apache-2.0 (IBM). A model you load through `CustomLayoutModel` carries
+whatever license it came with — see the [licensing note](#bring-your-own-model).
 
 ## 🙏 Acknowledgments
 
-- [IBM Docling](https://github.com/docling-project/docling) — `docling-layout-heron`, the shipped detector
-- [DocLayNet](https://github.com/DS4SD/DocLayNet) — the taxonomy and training data behind it
-- [PaddleOCR / PaddleX](https://github.com/PaddlePaddle/PaddleOCR) — the PP-LCNet orientation classifier and the PaddleDetection decoding contract
+- [PaddleOCR / PaddleX](https://github.com/PaddlePaddle/PaddleOCR) — `PP-DocLayoutV3`, the default detector, plus the `PP-LCNet` orientation classifier and the PaddleDetection decoding contract
+- [IBM Docling](https://github.com/docling-project/docling) — `docling-layout-heron`, the second shipped detector
+- [DocLayNet](https://github.com/DS4SD/DocLayNet) — the taxonomy and training data behind heron
 - [ONNX Runtime](https://onnxruntime.ai/) — neural network execution
-- [SixLabors.ImageSharp](https://github.com/SixLabors/ImageSharp) — image I/O, resizing and rotation
+- [EasyImageSharp](https://github.com/FarhanLodi/EasyImageSharp) (MIT) — image I/O, resizing and rotation
 - [EasyOcrSharp](https://github.com/FarhanLodi/EasyOcrSharp) — the sample OCR bridge, and the sibling project this one was carved out of
 
 <div align="center">

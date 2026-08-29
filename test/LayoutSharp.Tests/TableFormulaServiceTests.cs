@@ -3,8 +3,8 @@ using LayoutSharp.Models;
 using LayoutSharp.Recognition;
 using LayoutSharp.Services;
 using Microsoft.Extensions.DependencyInjection;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
 using Xunit;
 
 namespace LayoutSharp.Tests;

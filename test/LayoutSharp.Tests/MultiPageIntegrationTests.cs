@@ -1,10 +1,10 @@
 using LayoutSharp.Internal;
 using LayoutSharp.Models;
 using LayoutSharp.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Tiff;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using EasyImageSharp;
+using EasyImageSharp.Formats.Tiff;
+using EasyImageSharp.PixelFormats;
+using EasyImageSharp.Processing;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -100,7 +100,7 @@ public class MultiPageIntegrationTests : IClassFixture<MultiPageFixture>
             await multi.SaveAsync(ms, new TiffEncoder());
             tiff = ms.ToArray();
         }
-        Assert.Equal(2, Image.Identify(tiff).FrameMetadataCollection.Count);
+        Assert.Equal(2, Image.Identify(tiff).FrameCount);
 
         // Baseline: the two pages analyzed one at a time.
         var single1 = (await _svc.AnalyzeAsync(page1)).Document.Pages[0];

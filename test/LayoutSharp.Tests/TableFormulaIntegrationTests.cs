@@ -1,8 +1,8 @@
 using LayoutSharp.Models;
 using LayoutSharp.Recognition;
 using LayoutSharp.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
 using Xunit;
 using Xunit.Abstractions;
 

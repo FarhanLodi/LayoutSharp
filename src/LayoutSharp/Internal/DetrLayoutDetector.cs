@@ -1,8 +1,8 @@
 using LayoutSharp.Models;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using EasyImageSharp;
+using EasyImageSharp.PixelFormats;
 
 namespace LayoutSharp.Internal;
 
@@ -136,7 +136,7 @@ internal sealed class DetrLayoutDetector : IDetectionSession
     public IReadOnlyList<RawDetection> Detect(Image<Rgb24> image, float scoreThreshold)
     {
         int size = _spec.InputSize;
-        var pixels = ImageProcessing.Preprocess(image, size, _spec.ImageNetNormalize);
+        var pixels = ImageProcessing.Preprocess(image, size, _spec.ImageNetNormalize, _spec.Interpolation);
 
         var inputs = new List<NamedOnnxValue>(1)
         {
